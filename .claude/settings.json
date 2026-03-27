@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx shadcn@latest add *)",
+      "Bash(npm run build-storybook*)"
+    ]
+  },
+  "enabledPlugins": {},
+  "hooks": {},
+  "includeCoAuthoredBy": false,
+  "statusLine": {
+    "type": "command",
+    "command": "node \"$CLAUDE_PROJECT_DIR/.claude/statusline.cjs\"",
+    "padding": 0
+  }
+}

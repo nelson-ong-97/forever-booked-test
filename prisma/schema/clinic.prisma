@@ -1,0 +1,79 @@
+// ============================================================================
+// CLINIC ENUMS
+// ============================================================================
+
+enum UserRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+// ============================================================================
+// CORE TENANT TABLES
+// ============================================================================
+
+// Root tenant entity. Each clinic is a completely isolated tenant.
+// Stores baseline info reused across campaigns for AI copy generation.
+model Clinic {
+  id       String @id @default(uuid())
+  name     String
+  location String // City/region — used in ad targeting and copy
+  timezone String @default("America/New_York") // For schedule interpretation
+
+  // AI copy generation context — entered during onboarding, updated occasionally.
+  // JSON because these are freeform descriptors that vary per clinic.
+  brandVoice   Json? // e.g., {"tone": "professional", "keywords": ["luxury", "rejuvenation"]}
+  trustSignals Json? // e.g., {"years_in_business": 10, "certifications": ["Board Certified"]}
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  users          User[]
+  offers         Offer[]
+  metaOAuthToken MetaOAuthToken?
+  campaigns      Campaign[]
+
+  @@map("clinics")
+}
+
+// Users belong to exactly one clinic. Role determines permissions.
+// Kept simple — no cross-clinic access needed per requirements.
+model User {
+  id       String   @id @default(uuid())
+  clinicId String   @map("clinic_id")
+  email    String   @unique
+  name     String
+  role     UserRole @default(MEMBER)
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  clinic            Clinic              @relation(fields: [clinicId], references: [id])
+  campaignStatusLog CampaignStatusLog[]
+
+  @@index([clinicId])
+  @@map("users")
+}
+
+// Per-clinic Meta ad account connection via OAuth.
+// 1:1 with Clinic — each clinic connects one Meta ad account.
+// Tokens are encrypted at rest (application-level encryption, not stored as plaintext).
+model MetaOAuthToken {
+  id             String   @id @default(uuid())
+  clinicId       String   @unique @map("clinic_id")
+  adAccountId    String   @map("ad_account_id") // Meta's act_XXXXX format
+  accessToken    String   @map("access_token") // Encrypted at application level
+  tokenExpiresAt DateTime @map("token_expires_at")
+  refreshToken   String?  @map("refresh_token") // Encrypted — may not always be available
+  metaPageId     String?  @map("meta_page_id") // Connected Facebook page for ad delivery
+  scopes         String[] // Granted OAuth scopes for validation
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  clinic Clinic @relation(fields: [clinicId], references: [id])
+
+  @@map("meta_oauth_tokens")
+}

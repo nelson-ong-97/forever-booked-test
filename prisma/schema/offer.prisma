@@ -1,0 +1,46 @@
+// ============================================================================
+// OFFER DOMAIN
+// ============================================================================
+
+// System-level templates shared across all clinics.
+// Pre-fill offer fields to speed up campaign creation.
+// No clinic_id — these are managed by the platform, not tenants.
+model OfferTemplate {
+  id           String @id @default(uuid())
+  name         String // e.g., "Botox Special", "Laser Hair Removal Package"
+  category     String // e.g., "Injectables", "Body Contouring", "Facial"
+  defaultPrice Int // In cents — avoids floating-point rounding issues
+  defaultItems Json // e.g., ["20 units Botox", "Free consultation"]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  offers Offer[]
+
+  @@map("offer_templates")
+}
+
+// Clinic-specific offer, optionally created from a template.
+// An offer is the business concept ("Spring Botox $199") that drives campaigns.
+model Offer {
+  id         String  @id @default(uuid())
+  clinicId   String  @map("clinic_id")
+  templateId String? @map("template_id") // Null if created from scratch
+
+  name           String
+  price          Int // In cents
+  includedItems  Json // e.g., ["20 units Botox", "Free consultation"]
+  scarcityDetail String? @map("scarcity_detail") // e.g., "Only 10 spots available"
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  clinic   Clinic         @relation(fields: [clinicId], references: [id])
+  template OfferTemplate? @relation(fields: [templateId], references: [id])
+
+  campaigns Campaign[]
+
+  @@index([clinicId])
+  @@map("offers")
+}

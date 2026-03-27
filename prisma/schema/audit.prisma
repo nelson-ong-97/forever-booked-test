@@ -1,0 +1,61 @@
+// ============================================================================
+// AUDIT ENUMS
+// ============================================================================
+
+// Tracks where a status change originated — important for audit trail
+// to distinguish user actions from automated Meta syncs.
+enum StatusChangeSource {
+  USER
+  META_SYNC
+  SYSTEM
+}
+
+// ============================================================================
+// AUDIT & SYNC TABLES
+// ============================================================================
+
+// Immutable log of every campaign status change.
+// "Pick any campaign, reconstruct what happened" — this table makes that possible.
+// Never updated or deleted — append-only audit trail.
+model CampaignStatusLog {
+  id         String @id @default(uuid())
+  campaignId String @map("campaign_id")
+
+  previousStatus CampaignStatus @map("previous_status")
+  newStatus      CampaignStatus @map("new_status")
+
+  // Who/what triggered the change
+  source    StatusChangeSource
+  changedBy String?            @map("changed_by") // User ID if source=USER, null if system/sync
+
+  note String? // Optional context, e.g., "Meta API returned error 190: token expired"
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  campaign Campaign @relation(fields: [campaignId], references: [id])
+  user     User?    @relation(fields: [changedBy], references: [id])
+
+  @@index([campaignId, createdAt])
+  @@map("campaign_status_log")
+}
+
+// Raw sync events from Meta's API.
+// Stores full API responses for debugging and data reconciliation.
+// Useful when Meta's data diverges from ours — we can replay the sync history.
+model MetaSyncLog {
+  id         String @id @default(uuid())
+  campaignId String @map("campaign_id")
+
+  syncType    String // e.g., "performance_fetch", "status_update", "campaign_create"
+  rawResponse Json    @map("raw_response") // Full Meta API response — invaluable for debugging
+  success     Boolean @default(true)
+  errorCode   String? @map("error_code") // Meta error code if failed
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  campaign Campaign @relation(fields: [campaignId], references: [id])
+
+  @@index([campaignId, createdAt])
+  @@index([syncType])
+  @@map("meta_sync_log")
+}
