@@ -1,128 +1,177 @@
-# ForeverBooked — Backend Developer Assessment
+# Forever Booked — Contact Center Backend
 
-Backend design and proof-of-concept for the Meta Ads campaign launcher feature.
+Multi-tenant SaaS backend for medical/aesthetic clinic contact centers. Unified inbox with SMS, calling, and follow-up cadence engine.
 
-## Quick Links
+## Tech Stack
 
-| Deliverable | Location |
+| Layer | Technology |
 |---|---|
-| Database Schema (Prisma) | [`prisma/`](prisma/) — multi-file: schema.prisma + schema/ (clinic, offer, campaign, audit) |
-| Database Schema (SQL DDL) | [`sql/schema.sql`](sql/schema.sql) |
-| Schema ERD Diagram | [`diagrams/schema-erd.md`](diagrams/schema-erd.md) |
-| API Design | [`docs/api-design.md`](docs/api-design.md) |
-| Decision Log | [`docs/decision-log.md`](docs/decision-log.md) |
-| Written Answers | [`docs/written-answers.md`](docs/written-answers.md) |
-| Meta Integration POC | [`src/`](src/) |
+| Backend | NestJS 10 + TypeScript (strict mode) |
+| ORM | Prisma + PostgreSQL |
+| Queue | BullMQ + Redis (@nestjs/bull) |
+| Real-time | NestJS WebSocket Gateway + Socket.io + Redis pub/sub |
+| Auth | Better Auth (Organizations plugin) |
+| Hosting | Railway (PostgreSQL + Redis + NestJS) |
+| Storage | Railway Storage Buckets (S3-compatible) |
+| SMS/Voice | Twilio (SMS + WebRTC calling + recording) |
+| Email | Mailgun (transactional) |
+| AI | Anthropic Claude API |
+| Billing | Stripe (subscription + metered rebilling) |
+| Monitoring | Sentry (errors) + PostHog (product analytics) |
 
-## Project Structure
-
-```
-├── prisma/
-│   ├── schema.prisma               # Generator, datasource, shared enums
-│   └── schema/
-│       ├── clinic.prisma           # Clinic, User, MetaOAuthToken
-│       ├── offer.prisma            # OfferTemplate, Offer
-│       ├── campaign.prisma         # Campaign, CampaignConfig, Ad, AdMedia
-│       └── audit.prisma            # CampaignStatusLog, MetaSyncLog
-├── prisma.config.ts                # Prisma 7 config (schema path, datasource, migrations)
-├── sql/
-│   └── schema.sql                  # PostgreSQL DDL with indexes and constraints
-├── src/
-│   ├── constants.ts                # Application-wide constants
-│   ├── helpers.ts                  # Shared utility functions
-│   ├── types.ts                    # Domain types mirroring Prisma schema
-│   ├── meta-http-post.ts           # Raw HTTP helper for Meta Graph API
-│   ├── meta-api-client.ts          # Campaign, Ad Set, Ad Creative, Ad creation
-│   └── create-campaign.ts          # Main entry — launches full campaign structure
-├── docs/
-│   ├── api-design.md               # RESTful /api/v1/ endpoints with request/response shapes
-│   ├── decision-log.md             # 23 decisions with alternatives and reasoning
-│   └── written-answers.md          # HIPAA messaging, risks, experience, patterns
-└── diagrams/
-    └── schema-erd.md               # Mermaid ERD diagram
-```
-
-## Meta Integration POC
+## Getting Started
 
 ### Prerequisites
 
-- Node.js 18+ (for native `fetch`)
-- Docker Desktop (for local PostgreSQL)
-- A Meta Developer account with a **Business Portfolio** containing:
-  - A Facebook Page connected to the ad account
-  - An ad account with a payment method attached
-  - A Meta app with Marketing API use case enabled
-- Access token with permissions: `ads_management`, `ads_read`, `pages_read_engagement`, `pages_show_list`, `pages_manage_ads`
+- Node.js 20+
+- Docker Desktop (for local PostgreSQL + Redis)
+- Twilio account (test credentials for dev)
+- Better Auth configured
 
 ### Setup
 
 ```bash
-# Install dependencies
+# Clone and install
+git clone <repo-url>
+cd forever-booked-api
 npm install
 
-# Start local PostgreSQL (port 4040)
-npm run db:up
-
-# Copy env file and fill in your credentials
+# Environment
 cp .env.example .env
-# Edit .env: META_ACCESS_TOKEN, META_AD_ACCOUNT_ID (act_XXX), META_PAGE_ID
+# Fill in: DATABASE_URL, REDIS_URL, TWILIO_*, BETTER_AUTH_*, SENTRY_DSN, POSTHOG_KEY
 
-# Run Prisma migration
-npm run db:migrate
+# Database
+npx prisma migrate dev
+npx prisma generate
 
-# Run the POC
-npm run poc
+# Run
+npm run start:dev
 ```
 
-### What It Does
+### Run Commands
 
-Creates a complete campaign structure in Meta's sandbox:
+```bash
+npm run start:dev          # Development server (hot reload)
+npm run build              # Production build
+npm run lint               # ESLint check
+npm run test               # Unit tests (no DB required)
+npm run test:e2e           # Integration tests (needs test DB)
+npm run test:isolation     # Tenant isolation tests (CI-blocking)
+npm run test:cov           # Coverage report
+npx prisma migrate dev     # Run pending migrations
+npx prisma studio          # Visual database browser
+```
+
+## Architecture
+
+3-layer pattern: **Controller** (HTTP only) -> **Service** (all logic) -> **Model** (Prisma schema)
 
 ```
-Offer: "Spring Botox Special" ($199)
-  └── Campaign (OUTCOME_AWARENESS, status=PAUSED)
-        └── Ad Set (budget in account currency, US, ages 25-55)
-              ├── Ad: Social Proof   → "Join 500+ Happy Clients"
-              ├── Ad: Pain Point     → "Tired of Fine Lines?"
-              └── Ad: Urgency        → "Limited: Spring Special Ending Soon"
+React Frontend (Vercel)
+        |
+        v
+NestJS API (Railway)  -->  PostgreSQL + Redis (Railway)
+        |
+        +-- Twilio (SMS + Voice)
+        +-- Mailgun (Email)
+        +-- Anthropic (AI)
+        +-- Stripe (Billing)
+        +-- Railway Storage Buckets (Storage)
 ```
 
-All resources are created with `status=PAUSED` to prevent accidental spend.
+Multi-tenancy: shared database with `tenant_id` on every table + Row Level Security (RLS) + TenantGuard middleware. Belt-and-suspenders isolation.
 
-### Domain → Meta Mapping
+API: `/api/v1` prefix, cursor-based pagination, Swagger at `/api/docs`.
 
-| ForeverBooked | Meta Entity | Notes |
+See [docs/system-architecture.md](docs/system-architecture.md) for full details.
+
+## Project Structure
+
+```
+src/
+  app.module.ts
+  main.ts
+  common/           # Guards, interceptors, filters, decorators, shared DTOs
+  config/            # Environment validation (Zod)
+  prisma/            # PrismaModule + PrismaService (global)
+  auth/              # Better Auth integration
+  tenant/            # TenantGuard, TenantContext, @Tenant() decorator
+  contacts/          # Contact CRUD + custom fields + search
+  conversations/     # Conversation threading
+  messages/          # Message storage + send
+  cadence/           # Follow-up state machine + scheduler
+  calls/             # WebRTC calling + recording
+  webhooks/          # Queue-first Twilio webhook processing
+  notifications/     # Lead alerts (email + SMS)
+  integrations/      # External provider adapters (Twilio, Mailgun, Anthropic)
+  billing/           # Stripe integration (v1.5)
+  gateway/           # WebSocket gateway + Redis pub/sub
+prisma/
+  schema.prisma      # Database schema (source of truth)
+  migrations/
+test/
+  *.e2e-spec.ts      # Integration tests
+  tenant-isolation.e2e-spec.ts  # Cross-tenant isolation (CI-blocking)
+```
+
+Each module follows: `module.ts`, `controller.ts`, `service.ts`, `service.spec.ts`, `dto/`
+
+See [docs/project-structure.md](docs/project-structure.md) for full details.
+
+## Documentation
+
+| Document | Purpose |
+|---|---|
+| [docs/system-architecture.md](docs/system-architecture.md) | Architecture overview, data flows, multi-tenancy |
+| [docs/code-standards.md](docs/code-standards.md) | NestJS coding standards, 3-layer pattern, naming |
+| [docs/api-conventions.md](docs/api-conventions.md) | REST conventions, /api/v1, pagination, error format |
+| [docs/api-design.md](docs/api-design.md) | API endpoint catalog (all routes) |
+| [docs/testing-standards.md](docs/testing-standards.md) | Testing strategy, spec files, tenant isolation |
+| [docs/project-structure.md](docs/project-structure.md) | Folder layout, module organization |
+
+## Development Workflow
+
+Each Linear ticket = one branch = one PR:
+
+```
+1. Pick next unblocked ticket from Linear
+2. Create branch: git checkout -b FOR-5-setup-nestjs-scaffold
+3. Implement ONLY what the ticket describes
+4. Write .spec.ts tests for new services
+5. npm run lint && npm run test
+6. PR to main -> CI checks (lint + typecheck + tests)
+7. Merge -> Linear auto-closes ticket -> Slack notified
+8. Next ticket
+```
+
+Branch format: `FOR-{N}-{description}` (auto-links to Linear via GitHub integration)
+
+## Implementation Plan
+
+8 phases, 92 tickets, 12-week timeline to first pilot clinic:
+
+| Phase | Weeks | What |
 |---|---|---|
-| Offer | — | Parent context, not a Meta entity |
-| Campaign + Objective | Campaign | `special_ad_categories: []` required even if empty |
-| CampaignConfig (budget, targeting) | Ad Set | `daily_budget` in cents, minimum $5/day |
-| Ad (angle copy + media) | Ad Creative + Ad | Each angle = one creative + one ad |
+| 1. Foundation | 1 | NestJS scaffold, Prisma, RLS, Auth, Railway, CI/CD |
+| 2. Twilio + Data | 2-3 | Contacts, webhooks, SMS send/receive, phone provisioning |
+| 3. Inbox | 4-5 | Conversations, messages, WebSocket, frontend integration |
+| 4. Cadence | 6-7 | Follow-up state machine, dispositions, scheduling |
+| 5. Calling | 8-9 | WebRTC click-to-call, recording, lead alerts |
+| 6. Hardening | 10-12 | Tests, load test, production deploy, first pilot clinic |
+| 7. v1.5 | Post-v1 | Rebilling, Meta Ads, bulk SMS, AI follow-up |
+| 8. v2 | Post-v1.5 | Social channels (IG, Messenger, WhatsApp, webchat, email) |
 
-### Meta API Notes
+Full plan: [plans/260412-0034-contact-center-implementation/plan.md](plans/260412-0034-contact-center-implementation/plan.md)
 
-- **API Version:** v25.0
-- **Auth:** Form-encoded POST with `access_token` parameter (no OAuth flow in POC)
-- **`special_ad_categories`**: Must be included even when empty — omitting causes rejection
-- **Budget**: Integer in the ad account's currency smallest unit. Minimum varies by currency (e.g. đ26,445 for VND). Set `dailyBudget` in `create-campaign.ts` to match your account's currency
-- **All resources PAUSED**: Prevents accidental spend during testing
-- **Error format**: Meta returns `{ error: { message, type, code, error_subcode } }`
+## Security
 
-## Schema Highlights
+- Multi-tenant isolation enforced at DB layer (RLS) AND app layer (TenantGuard)
+- Twilio HMAC signature verification on all webhooks
+- Idempotency keys on all webhook handlers
+- No PII in logs or analytics events
+- Secrets via environment variables only (never committed)
+- Rate limiting via @nestjs/throttler with Redis store
 
-- **Multi-tenant**: Shared database, `clinic_id` on every tenant-scoped table
-- **Multi-file Prisma schema**: Split by domain (clinic, offer, campaign, audit) — Prisma v7+ native support
-- **12 models, 7 enums**: Full coverage of the campaign launcher feature
-- **Audit trail**: Append-only `CampaignStatusLog` for full campaign history reconstruction
-- **JSON columns**: For Meta targeting spec, placements, offer items — avoids migration churn when Meta's API evolves
-- **Money in cents**: Integer, not float. Industry standard (Stripe, Meta both use cents)
+## License
 
-## Key Design Decisions (Summary)
-
-See [`docs/decision-log.md`](docs/decision-log.md) for full details on all 23 decisions. Highlights:
-
-1. **Shared DB multi-tenancy** — simpler than schema-per-tenant for 200+ clinics
-2. **CampaignConfig as separate table** — mirrors Meta's Campaign/Ad Set split
-3. **Idempotency key on launch** — prevents duplicate Meta campaigns on retry
-4. **Raw HTTP over Meta SDK** — shows API understanding, lighter, better typed
-5. **8-state campaign lifecycle** — intermediate states (LAUNCHING) prevent race conditions
-6. **API versioning (`/api/v1/`)** — supports non-breaking API evolution
+Proprietary. All rights reserved.
