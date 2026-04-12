@@ -146,23 +146,6 @@ Each Linear ticket = one branch = one PR:
 
 Branch format: `FOR-{N}-{description}` (auto-links to Linear via GitHub integration)
 
-## Implementation Plan
-
-8 phases, 92 tickets, 12-week timeline to first pilot clinic:
-
-| Phase | Weeks | What |
-|---|---|---|
-| 1. Foundation | 1 | NestJS scaffold, Prisma, RLS, Auth, Railway, CI/CD |
-| 2. Twilio + Data | 2-3 | Contacts, webhooks, SMS send/receive, phone provisioning |
-| 3. Inbox | 4-5 | Conversations, messages, WebSocket, frontend integration |
-| 4. Cadence | 6-7 | Follow-up state machine, dispositions, scheduling |
-| 5. Calling | 8-9 | WebRTC click-to-call, recording, lead alerts |
-| 6. Hardening | 10-12 | Tests, load test, production deploy, first pilot clinic |
-| 7. v1.5 | Post-v1 | Rebilling, Meta Ads, bulk SMS, AI follow-up |
-| 8. v2 | Post-v1.5 | Social channels (IG, Messenger, WhatsApp, webchat, email) |
-
-Full plan: [plans/260412-0034-contact-center-implementation/plan.md](plans/260412-0034-contact-center-implementation/plan.md)
-
 ## Security
 
 - Multi-tenant isolation enforced at DB layer (RLS) AND app layer (TenantGuard)
