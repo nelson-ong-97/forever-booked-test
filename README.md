@@ -81,7 +81,7 @@ NestJS API (Railway)  -->  PostgreSQL + Redis (Railway)
 
 Multi-tenancy: shared database with `tenant_id` on every table + Row Level Security (RLS) + TenantGuard middleware. Belt-and-suspenders isolation.
 
-API: `/api/v1` prefix, cursor-based pagination, Swagger at `/api/docs`.
+API: `/v1` prefix, cursor-based pagination, Swagger at `/docs`.
 
 See [docs/system-architecture.md](docs/system-architecture.md) for full details.
 
@@ -124,7 +124,7 @@ See [docs/project-structure.md](docs/project-structure.md) for full details.
 |---|---|
 | [docs/system-architecture.md](docs/system-architecture.md) | Architecture overview, data flows, multi-tenancy |
 | [docs/code-standards.md](docs/code-standards.md) | NestJS coding standards, 3-layer pattern, naming |
-| [docs/api-conventions.md](docs/api-conventions.md) | REST conventions, /api/v1, pagination, error format |
+| [docs/api-conventions.md](docs/api-conventions.md) | REST conventions, /v1, pagination, error format |
 | [docs/api-design.md](docs/api-design.md) | API endpoint catalog (all routes) |
 | [docs/testing-standards.md](docs/testing-standards.md) | Testing strategy, spec files, tenant isolation |
 | [docs/project-structure.md](docs/project-structure.md) | Folder layout, module organization |
