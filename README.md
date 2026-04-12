@@ -1,4 +1,4 @@
-# Forever Booked — Contact Center Backend
+# Forever Booked — Backend
 
 Multi-tenant SaaS backend for medical/aesthetic clinic contact centers. Unified inbox with SMS, calling, and follow-up cadence engine.
 
